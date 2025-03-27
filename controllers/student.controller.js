@@ -8,7 +8,7 @@ module.exports.showAttendanceForm = async (req, res) => {
 
         // Check if attendance sheet exists and is not expired
         const [sheet] = await db.execute(
-            "SELECT * FROM AttendanceSheet WHERE attendance_id = ? AND expires_at > NOW()",
+            "SELECT * FROM attendancesheet WHERE attendance_id = ? AND expires_at > NOW()",
             [attendance_id]
         );
 
@@ -18,9 +18,9 @@ module.exports.showAttendanceForm = async (req, res) => {
 
         // Get classes associated with this attendance sheet
         const [classes] = await db.execute(
-            `SELECT Class.* FROM Class 
-             INNER JOIN AttendanceSheet_Class ON Class.class_id = AttendanceSheet_Class.class_id 
-             WHERE AttendanceSheet_Class.attendance_id = ?`,
+            `SELECT class.* FROM class 
+             INNER JOIN attendancesheet_class ON class.class_id = attendancesheet_class.class_id 
+             WHERE attendancesheet_class.attendance_id = ?`,
             [attendance_id]
         );
 
@@ -66,7 +66,7 @@ module.exports.markAttendance = async (req, res) => {
         // 🔹 2️⃣ Check if the attendance sheet is active
         const [attendance] = await db.execute(
             `SELECT latitude, longitude, expires_at 
-             FROM AttendanceSheet 
+             FROM attendancesheet 
              WHERE attendance_id = ? AND expires_at > NOW()`,
             [attendance_id]
         );
@@ -79,7 +79,7 @@ module.exports.markAttendance = async (req, res) => {
 
         // 🔹 3️⃣ Check if the student already marked attendance
         const [existingAttendance] = await db.execute(
-            `SELECT * FROM StudentAttendance 
+            `SELECT * FROM studentattendance 
              WHERE attendance_id = ? AND (roll_no = ? OR device_id = ?)`,
             [attendance_id, roll, finalDeviceId]
         );
@@ -103,7 +103,7 @@ module.exports.markAttendance = async (req, res) => {
 
         // 🔹 6️⃣ Mark attendance with device ID
         await db.execute(
-            `INSERT INTO StudentAttendance (attendance_id, student_name, roll_no, status, device_id, class_id) 
+            `INSERT INTO studentattendance (attendance_id, student_name, roll_no, status, device_id, class_id) 
              VALUES (?, ?, ?, 'Present', ?, ?)`,
             [attendance_id, name, roll, finalDeviceId, class_id]
         );

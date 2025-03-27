@@ -6,13 +6,13 @@ module.exports.register = async(req, res) => {
     const { name, email, password, subject } = req.body;
     try {
         // Check if the teacher already exists
-        const [existingTeacher] = await db.execute("SELECT * FROM Teacher WHERE email = ?", [email]);
-        if (existingTeacher.length > 0) {
-            return res.status(400).json({ message: 'Teacher already exists' });
+        const [existingteacher] = await db.execute("SELECT * FROM teacher WHERE email = ?", [email]);
+        if (existingteacher.length > 0) {
+            return res.status(400).json({ message: 'teacher already exists' });
         }
 
         // Register the new teacher
-        const teacher = await db.execute("INSERT INTO Teacher (name, email, password, subject) VALUES (?, ?, ?, ?)", 
+        const teacher = await db.execute("INSERT INTO teacher (name, email, password, subject) VALUES (?, ?, ?, ?)", 
             [name, email, password, subject]);
         const token = jwt.sign({ email: email }, process.env.JWT_SECRET);
         res.cookie('token', token);
@@ -25,7 +25,7 @@ module.exports.login = async(req, res) => {
     const { email, password } = req.body;
     try {
         // Check if the teacher exists
-        const [teacher] = await db.execute("SELECT * FROM Teacher WHERE email = ? AND password = ?", [email, password]);
+        const [teacher] = await db.execute("SELECT * FROM teacher WHERE email = ? AND password = ?", [email, password]);
         if (teacher.length === 0) {
             return res.status(400).json({ message: 'Invalid credentials' });
         }
@@ -42,23 +42,23 @@ module.exports.profile = async (req, res) => {
     const { email } = req.teacher;
     try {
         // Get the teacher's profile
-        const [teacher] = await db.execute("SELECT * FROM Teacher WHERE email = ?", [email]);
+        const [teacher] = await db.execute("SELECT * FROM teacher WHERE email = ?", [email]);
 
         // Get the total number of attendance sheets created by the teacher
         const [attendanceCount] = await db.execute(
-            "SELECT COUNT(*) AS totalAttendances FROM AttendanceSheet WHERE attendance_id IN (SELECT attendance_id FROM Teacher_AttendanceSheet WHERE teacher_id = ?)",
+            "SELECT COUNT(*) AS totalAttendances FROM attendancesheet WHERE attendance_id IN (SELECT attendance_id FROM teacher_attendancesheet WHERE teacher_id = ?)",
             [teacher[0].teacher_id]
         );
 
         // Get the list of attendance sheets created by the teacher
         const [attendanceSheets] = await db.execute(
-            "SELECT AttendanceSheet.* FROM AttendanceSheet INNER JOIN Teacher_AttendanceSheet ON AttendanceSheet.attendance_id = Teacher_AttendanceSheet.attendance_id WHERE Teacher_AttendanceSheet.teacher_id = ?",
+            "SELECT attendancesheet.* FROM attendancesheet INNER JOIN teacher_attendancesheet ON attendancesheet.attendance_id = teacher_attendancesheet.attendance_id WHERE teacher_attendancesheet.teacher_id = ?",
             [teacher[0].teacher_id]
         );
 
         // 🔹 Get the classes assigned to the teacher
         const [classes] = await db.execute(
-            "SELECT Class.* FROM Class INNER JOIN Teacher_Class ON Class.class_id = Teacher_Class.class_id WHERE Teacher_Class.teacher_id = ?",
+            "SELECT class.* FROM class INNER JOIN teacher_class ON class.class_id = teacher_class.class_id WHERE teacher_class.teacher_id = ?",
             [teacher[0].teacher_id]
         );
         console.log(attendanceSheets);
@@ -86,13 +86,16 @@ module.exports.createAttendanceForm = async (req, res) => {
 
         // Get teacher ID
         const [teacher] = await db.execute(
-            "SELECT teacher_id FROM Teacher WHERE email = ?",
+            "SELECT teacher_id FROM teacher WHERE email = ?",
             [email]
         );
+        await db.execute(`
+            SET time_zone = 'Asia/Kolkata';
+        `);
 
         // Insert into AttendanceSheet
         const [result] = await db.execute(
-            `INSERT INTO AttendanceSheet (sheet_name, date, expires_at, latitude, longitude) 
+            `INSERT INTO attendancesheet (sheet_name, date, expires_at, latitude, longitude) 
              VALUES (?, NOW(), DATE_ADD(NOW(), INTERVAL 5 MINUTE), ?, ?)`,
             [name, latitude, longitude]
         );
@@ -101,7 +104,7 @@ module.exports.createAttendanceForm = async (req, res) => {
 
         // Associate with teacher
         await db.execute(
-            "INSERT INTO Teacher_AttendanceSheet (teacher_id, attendance_id) VALUES (?, ?)",
+            "INSERT INTO teacher_attendancesheet (teacher_id, attendance_id) VALUES (?, ?)",
             [teacher[0].teacher_id, attendance_id]
         );
 
@@ -111,7 +114,7 @@ module.exports.createAttendanceForm = async (req, res) => {
         // Associate with selected classes
         for (const class_id of classIdArray) {
             await db.execute(
-                "INSERT INTO AttendanceSheet_Class (attendance_id, class_id) VALUES (?, ?)",
+                "INSERT INTO attendancesheet_class (attendance_id, class_id) VALUES (?, ?)",
                 [attendance_id, class_id]
             );
         }
@@ -122,7 +125,7 @@ module.exports.createAttendanceForm = async (req, res) => {
 
         // Update AttendanceSheet with QR code URL
         await db.execute(
-            "UPDATE AttendanceSheet SET qr_code = ? WHERE attendance_id = ?",
+            "UPDATE attendancesheet SET qr_code = ? WHERE attendance_id = ?",
             [qrCodeDataUrl, attendance_id]
         );
 
@@ -152,8 +155,8 @@ module.exports.attendanceDetails = async (req, res) => {
                 sa.student_name, 
                 sa.roll_no, 
                 c.class_name
-             FROM StudentAttendance sa
-             INNER JOIN Class c ON sa.class_id = c.class_id
+             FROM studentattendance sa
+             INNER JOIN class c ON sa.class_id = c.class_id
              WHERE sa.attendance_id = ?`,
             [attendance_id]
         );
